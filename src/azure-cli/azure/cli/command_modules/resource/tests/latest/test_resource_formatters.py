@@ -188,7 +188,7 @@ class TestFormatWhatIfOperationResult(unittest.TestCase):
     def test_group_resources_changes_by_sorted_scope(self):
         changes = [
             WhatIfChange(
-                resource_id="/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg1/providers/p1/foo1",
+                resource_id="/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/RG1/providers/p1/foo1",
                 change_type=ChangeType.create,
             ),
             WhatIfChange(
@@ -214,7 +214,7 @@ class TestFormatWhatIfOperationResult(unittest.TestCase):
         ]
 
         expected = f"""
-Scope: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg1
+Scope: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/RG1
 {Color.GREEN}
   + p1/foo1
   + p2/bar
@@ -273,9 +273,9 @@ Scope: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg1
   - p6/foo
   - p7/foo{Color.RESET}{Color.GREEN}
   + p2/foo{Color.RESET}{Color.BLUE}
-  ! p4/foo{Color.RESET}{Color.GRAY}
-  * p1/foo{Color.RESET}{Color.RESET}
-  = p3/foo
+  ! p4/foo{Color.RESET}{Color.RESET}
+  = p3/foo{Color.RESET}{Color.GRAY}
+  * p1/foo
 {Color.RESET}"""
         result = format_what_if_operation_result(WhatIfOperationResult(changes=changes))
 
@@ -350,6 +350,16 @@ Scope: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg1
                         after="bar",
                     ),
                     WhatIfPropertyChange(
+                        path="path.a.to.change2",
+                        property_change_type=PropertyChangeType.modify,
+                        before={
+                            "tag1": "value"
+                        },
+                        after={
+                            "tag2": "value"
+                        },
+                    ),
+                    WhatIfPropertyChange(
                         path="path.b.to.nested.change",
                         property_change_type=PropertyChangeType.array,
                         children=[
@@ -384,6 +394,14 @@ Scope: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg1
 {Color.PURPLE}
   ~ p1/foo{Color.RESET}
     {Color.PURPLE}~{Color.RESET} path.a.to.change{Color.RESET}:{Color.RESET} {Color.ORANGE}"foo"{Color.RESET} => {Color.GREEN}"bar"{Color.RESET}
+    {Color.PURPLE}~{Color.RESET} path.a.to.change2{Color.RESET}:{Color.RESET}{Color.ORANGE}
+
+        tag1{Color.RESET}:{Color.ORANGE} "value"
+{Color.RESET}
+      =>{Color.GREEN}
+
+        tag2{Color.RESET}:{Color.GREEN} "value"
+{Color.RESET}
     {Color.PURPLE}~{Color.RESET} path.b.to.nested.change{Color.RESET}:{Color.RESET} [
       {Color.PURPLE}~{Color.RESET} 4{Color.RESET}:{Color.RESET}
 

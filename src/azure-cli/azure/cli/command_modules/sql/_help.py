@@ -22,29 +22,59 @@ type: group
 short-summary: Manage a database's auditing policy.
 """
 
+helps['sql db audit-policy wait'] = """
+type: command
+short-summary: Place the CLI in a waiting state until a condition of the database's audit policy is met.
+examples:
+  - name: Place the CLI in a waiting state until it determines that database's audit policy exists
+    text: az sql db audit-policy wait -g mygroup -s myserver -n mydb --exists
+"""
+
 helps['sql db audit-policy update'] = """
 type: command
 short-summary: Update a database's auditing policy.
 long-summary: If the policy is being enabled, `--storage-account` or both `--storage-endpoint` and `--storage-key` must be specified.
 examples:
   - name: Enable by storage account name.
-    text: az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled --storage-account mystorage
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled \\
+            --bsts Enabled --storage-account mystorage
   - name: Enable by storage endpoint and key.
     text: |
         az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled \\
-            --storage-endpoint https://mystorage.blob.core.windows.net --storage-key MYKEY==
+            --bsts Enabled --storage-endpoint https://mystorage.blob.core.windows.net \\
+            --storage-key MYKEY==
   - name: Set the list of audit actions.
     text: |
         az sql db audit-policy update -g mygroup -s myserver -n mydb \\
             --actions FAILED_DATABASE_AUTHENTICATION_GROUP 'UPDATE on database::mydb by public'
-  - name: Add an audit action.
-    text: |
-        az sql db audit-policy update -g mygroup -s myserver -n mydb \\
-            --add auditActionsAndGroups FAILED_DATABASE_AUTHENTICATION_GROUP
-  - name: Remove an audit action by list index.
-    text: az sql db audit-policy update -g mygroup -s myserver -n mydb --remove auditActionsAndGroups 0
   - name: Disable an auditing policy.
     text: az sql db audit-policy update -g mygroup -s myserver -n mydb --state Disabled
+  - name: Disable a blob storage auditing policy.
+    text: az sql db audit-policy update -g mygroup -s myserver -n mydb --bsts Disabled
+  - name: Enable a log analytics auditing policy.
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled \\
+            --lats Enabled --lawri myworkspaceresourceid
+  - name: Disable a log analytics auditing policy.
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb
+            --lats Disabled
+  - name: Enable an event hub auditing policy.
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid \\
+            --event-hub eventhubname
+  - name: Enable an event hub auditing policy for default event hub.
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid
+  - name: Disable an event hub auditing policy.
+    text: |
+        az sql db audit-policy update -g mygroup -s myserver -n mydb
+            --event-hub-target-state Disabled
 """
 
 helps['sql db copy'] = """
@@ -56,6 +86,9 @@ examples:
     text: az sql db copy -g mygroup -s myserver -n originalDb --dest-name newDb --service-objective S0
   - name: Create a database with GeneralPurpose edition, Gen4 hardware, and 1 vcore as a copy of an existing GeneralPurpose database.
     text: az sql db copy -g mygroup -s myserver -n originalDb --dest-name newDb -f Gen4 -c 1
+  - name: Create a database with local backup storage redundancy as a copy of an existing database
+    text: az sql db copy -g mygroup -s myserver -n originalDb --dest-name newDb --backup-storage-redundancy Local
+
 """
 
 helps['sql db create'] = """
@@ -75,7 +108,8 @@ examples:
     text: az sql db create -g mygroup -s myserver -n mydb -e GeneralPurpose -f Gen5 -c 2 --compute-model Serverless --auto-pause-delay 120
   - name: Create a Hyperscale Gen5 2 vcore database with 2 read replicas
     text: az sql db create -g mygroup -s myserver -n mydb -e Hyperscale -f Gen5 -c 2 --read-replicas 2
-
+  - name: Create a GeneralPurpose database with locally redundant backup storage
+    text: az sql db create -g mygroup -s myserver -n mydb -e GeneralPurpose --backup-storage-redundancy Local
 """
 
 helps['sql db delete'] = """
@@ -149,6 +183,27 @@ examples:
     text: az sql db list-editions -l westus --edition Standard -o table
   - name: Show available max database sizes for P1 service objective
     text: az sql db list-editions -l westus --service-objective P1 --show-details max-size
+"""
+
+helps['sql db str-policy'] = """
+type: group
+short-summary: Manage SQL database short term retention policy.
+"""
+
+helps['sql db str-policy set'] = """
+type: command
+short-summary: Update short term retention settings for a live database.
+examples:
+  - name: Set short term retention for a live database.
+    text: az sql db str-policy set -g mygroup -s myserver -n mydb --retention-days retentionindays --diffbackup-hours diffbackuphours
+"""
+
+helps['sql db str-policy show'] = """
+type: command
+short-summary: Show the short term retention policy for a live database.
+examples:
+  - name: Show short term retention policy for a live database.
+    text: az sql db str-policy show -g mygroup -s myserver -n mydb
 """
 
 helps['sql db ltr-policy'] = """
@@ -267,6 +322,8 @@ examples:
     text: az sql db replica create -g mygroup -s myserver -n originalDb --partner-server newDb --service-objective S0
   - name: Create a database with GeneralPurpose edition, Gen4 hardware, and 1 vcore as a secondary replica of an existing GeneralPurpose database
     text: az sql db replica create -g mygroup -s myserver -n originalDb --partner-server newDb -f Gen4 -c 1
+  - name: Create a database with with zone redundant backup storage as a secondary replica of an existing database.
+    text: az sql db replica create -g mygroup -s myserver -n originalDb --partner-server newDb --backup-storage-redundancy Zone
 """
 
 helps['sql db replica delete-link'] = """
@@ -300,6 +357,9 @@ examples:
     text: |
         az sql db restore --dest-name MyDest --edition GeneralPurpose --name MyAzureSQLDatabase --resource-group MyResourceGroup --server myserver --subscription MySubscription --time "2018-05-20T05:34:22"
     crafted: true
+  - name: Create a new database with geo-redundant backup storage by restoring from a backup. (autogenerated)
+    text: |
+        az sql db restore --dest-name MyDest --edition GeneralPurpose --name MyAzureSQLDatabase --resource-group MyResourceGroup --server myserver --subscription MySubscription --time "2018-05-20T05:34:22" --backup-storage-redundancy Geo
 """
 
 helps['sql db show'] = """
@@ -383,6 +443,8 @@ examples:
     text: az sql db update -g mygroup -s myserver -n mydb -z false
   - name: Update database to serverless compute model
     text: az sql db update -g mygroup -s myserver -n mydb --edition GeneralPurpose --capacity 2 --family Gen5 --compute-model Serverless
+  - name: Update database with locally redundant backup storage
+    text: az sql db update -g mygroup -s myserver -n mydb --backup-storage-redundancy Local
 
 """
 
@@ -600,6 +662,45 @@ examples:
     text: az sql instance-pool wait -n myinstancepool -g mygroup --created
 """
 
+helps['sql stg'] = """
+type: group
+short-summary: Manage Server Trust Groups.
+"""
+
+helps['sql stg create'] = """
+type: command
+short-summary: Create a Server Trust Group.
+examples:
+  - name: Create a Server Trust Group with specified resource ids of its members.
+    text: az sql stg create -g resourcegroup -l location -n stg-name --trust-scope GlobalTransactions -m $mi1-id $mi2-id
+"""
+
+helps['sql stg show'] = """
+type: command
+short-summary: Retrieve a Server Trust Group.
+examples:
+  - name: Retrieve a Server Trust Group.
+    text: az sql stg show -g resourcegroup -l location -n stg-name
+"""
+
+helps['sql stg delete'] = """
+type: command
+short-summary: Delete a Server Trust Group.
+examples:
+  - name: Delete a Server Trust Group.
+    text: az sql stg delete -g resourcegroup -l location -n stg-name
+"""
+
+helps['sql stg list'] = """
+type: command
+short-summary: Retrieve a list of Server Trust Groups.
+examples:
+  - name: Retrieve a list of Server Trust Groups by instance.
+    text: az sql stg list -g resourcegroup --instance-name mi1-name
+  - name: Retrieve a list of Server Trust Groups by location.
+    text: az sql stg list -g resourcegroup -l location
+"""
+
 helps['sql mi'] = """
 type: group
 short-summary: Manage SQL managed instances.
@@ -630,6 +731,35 @@ type: command
 short-summary: Updates an existing managed instance Active Directory administrator.
 """
 
+helps['sql mi ad-only-auth'] = """
+type: group
+short-summary: Manage a Managed Instance's Azure Active Directly only settings.
+"""
+
+helps['sql mi ad-only-auth enable'] = """
+type: command
+short-summary: Enable Azure Active Directly only Authentication for this Managed Instance.
+examples:
+  - name: Enable Active Directory only authentication for a managed instance
+    text: az sql mi ad-only-auth enable --resource-group mygroup --name myMI
+"""
+
+helps['sql mi ad-only-auth disable'] = """
+type: command
+short-summary: Disable Azure Active Directly only Authentication for this Managed Instance.
+examples:
+  - name: Disable Active Directory only authentication for a managed instance
+    text: az sql mi ad-only-auth disable --resource-group mygroup --name myMI
+"""
+
+helps['sql mi ad-only-auth get'] = """
+type: command
+short-summary: Get a specific Azure Active Directly only Authentication property.
+examples:
+  - name: Get Active Directory only authentication status for a managed instance
+    text: az sql mi ad-only-auth get --resource-group mygroup --name myMI
+"""
+
 helps['sql mi create'] = """
 type: command
 short-summary: Create a managed instance.
@@ -640,6 +770,24 @@ examples:
     text: az sql mi create -g mygroup -n myinstance -l mylocation -i -u myusername -p mypassword --license-type LicenseIncluded --subnet /subscriptions/{SubID}/resourceGroups/{ResourceGroup}/providers/Microsoft.Network/virtualNetworks/{VNETName}/subnets/{SubnetName} --capacity 8 --storage 32GB --edition GeneralPurpose --family Gen5
   - name: Create managed instance with specified parameters and tags
     text: az sql mi create -g mygroup -n myinstance -l mylocation -i -u myusername -p mypassword --license-type LicenseIncluded --subnet /subscriptions/{SubID}/resourceGroups/{ResourceGroup}/providers/Microsoft.Network/virtualNetworks/{VNETName}/subnets/{SubnetName} --capacity 8 --storage 32GB --edition GeneralPurpose --family Gen5 --tags tagName1=tagValue1 tagName2=tagValue2
+  - name: Create managed instance with specified parameters and backup storage redundancy specified
+    text: az sql mi create -g mygroup -n myinstance -l mylocation -i -u myusername -p mypassword --license-type LicenseIncluded --subnet /subscriptions/{SubID}/resourceGroups/{ResourceGroup}/providers/Microsoft.Network/virtualNetworks/{VNETName}/subnets/{SubnetName} --capacity 8 --storage 32GB --edition GeneralPurpose --family Gen5 --backup-storage-redundancy Local
+  - name: Create a managed instance with maintenance configuration
+    text: az sql mi create -g mygroup -n myinstance -l mylocation -i -u myusername -p mypassword --subnet /subscriptions/{SubID}/resourceGroups/{ResourceGroup}/providers/Microsoft.Network/virtualNetworks/{VNETName}/subnets/{SubnetName} -m SQL_{Region}_{MaintenanceConfigName}
+  - name: Create a managed instance without SQL Admin, with AAD admin and AD Only enabled
+    text: az sql mi create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName --external-admin-sid c5e964e2-6bb2-2222-1111-3b16ec0e1234 -g myResourceGroup -n miName --subnet /subscriptions/78975f9f-2222-1111-1111-29c42ac70000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/vnet-test/subnets/ManagedInstance
+  - name: Create a managed instance without SQL Admin, with AD admin, AD Only enabled, User ManagedIdenties and Identity Type is SystemAssigned,UserAssigned.
+    text: az sql mi create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName \\
+              --external-admin-sid c5e964e2-6bb2-1111-1111-3b16ec0e1234 -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type SystemAssigned,UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --subnet /subscriptions/78975f9f-2222-1111-1111-29c42ac70000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/vnet-test/subnets/ManagedInstance
+  - name: Create a managed instance without SQL Admin, with AD admin, AD Only enabled, User ManagedIdenties and Identity Type is UserAssigned.
+    text: az sql mi create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName \\
+              --external-admin-sid c5e964e2-6bb2-1111-1111-3b16ec0e1234 -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --subnet /subscriptions/78975f9f-2222-1111-1111-29c42ac70000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/vnet-test/subnets/ManagedInstance
 """
 
 helps['sql mi delete'] = """
@@ -731,6 +879,18 @@ examples:
   - name: Update a managed instance. (autogenerated)
     text: az sql mi update --name myinstance --public-data-endpoint-enabled true --resource-group mygroup --subscription MySubscription
     crafted: true
+  - name: Update a managed instance with maintenance configuration
+    text: az sql mi update -g mygroup -n myinstance -m SQL_{Region}_{MaintenanceConfigName}
+  - name: Remove maintenance configuration from managed instance
+    text: az sql mi update -g mygroup -n myinstance -m SQL_Default
+  - name: Update a managed instance with User Managed Identies and Identity Type is SystemAssigned,UserAssigned.
+    text: az sql mi update -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type SystemAssigned,UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
+  - name: Update a managed instance with User Managed Identies and Identity Type is UserAssigned.
+    text: az sql mi update -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
 """
 
 helps['sql midb'] = """
@@ -893,6 +1053,55 @@ type: command
 short-summary: Place the CLI in a waiting state until a condition of the managed database is met.
 """
 
+helps['sql midb log-replay'] = """
+type: group
+short-summary: SQL Managed Instance database Log Replay service commands.
+"""
+
+helps['sql midb log-replay start'] = """
+type: command
+short-summary: Start Log Replay service on specified database.
+examples:
+  - name: Start Log Replay service with auto complete option.
+    text: az sql midb log-replay start -g mygroup --mi myinstance -n mymanageddb -a --last-bn "backup.bak" --storage-uri "https://test.blob.core.windows.net/testing" --storage-sas "sv=2019-02-02&ss=b&srt=sco&sp=rl&se=2023-12-02T00:09:14Z&st=2019-11-25T16:09:14Z&spr=https&sig=92kAe4QYmXaht%2Fgjocqwerqwer41s%3D"
+  - name: Start Log Replay service without auto complete option.
+    text: az sql midb log-replay start -g mygroup --mi myinstance -n mymanageddb --storage-uri "https://test.blob.core.windows.net/testing" --storage-sas "sv=2019-02-02&ss=b&srt=sco&sp=rl&se=2023-12-02T00:09:14Z&st=2019-11-25T16:09:14Z&spr=https&sig=92kAe4QYmXaht%2Fgjocqwerqwer41s%3D"
+"""
+
+helps['sql midb log-replay complete'] = """
+type: command
+short-summary: Complete Log Replay service on specified database.
+examples:
+  - name: Complete log replay service.
+    text: az sql midb log-replay complete -g mygroup --mi myinstance -n mymanageddb --last-backup-name "backup.bak"
+"""
+
+helps['sql midb log-replay show'] = """
+type: command
+short-summary: Get status of Log Replay service.
+examples:
+  - name: Get status of the ongoing log replay service.
+    text: az sql midb log-replay show -g mygroup --mi myinstance -n mymanageddb
+"""
+
+helps['sql midb log-replay stop'] = """
+type: command
+short-summary: Stop Log Replay service.
+examples:
+  - name: Stop ongoing log replay service by deleting database.
+    text: az sql midb log-replay stop -g mygroup --mi myinstance -n mymanageddb
+"""
+
+helps['sql midb log-replay wait'] = """
+type: command
+short-summary: Place the CLI in a waiting state until a condition of the managed database is met.
+examples:
+  - name: Place the CLI in a waiting state until a condition of the managed database is met after starting log replay service.
+    text: az sql midb log-replay wait --exists --resource-group mygroup --managed-instance myinstance --name mymanageddb
+  - name: Place the CLI in a waiting state until a condition of the managed database is met after stopping log replay service.
+    text: az sql midb log-replay wait --deleted --resource-group mygroup --managed-instance myinstance --name mymanageddb
+"""
+
 helps['sql server'] = """
 type: group
 short-summary: Manage SQL servers.
@@ -913,9 +1122,46 @@ type: command
 short-summary: Update an existing server Active Directory administrator.
 """
 
+helps['sql server ad-only-auth'] = """
+type: group
+short-summary: Manage Azure Active Directly only Authentication settings for this Server.
+"""
+
+helps['sql server ad-only-auth enable'] = """
+type: command
+short-summary: Enable Azure Active Directly only Authentication for this Server.
+examples:
+  - name: Enable Active Directory only authentication for a sql server
+    text: az sql server ad-only-auth enable --resource-group mygroup --name myServer
+"""
+
+helps['sql server ad-only-auth disable'] = """
+type: command
+short-summary: Disable Azure Active Directly only Authentication for this Server.
+examples:
+  - name: Disable Active Directory only authentication for a sql server
+    text: az sql server ad-only-auth disable --resource-group mygroup --name myServer
+"""
+
+helps['sql server ad-only-auth get'] = """
+type: command
+short-summary: Get a specific Azure Active Directly only Authentication property.
+examples:
+  - name: Get Active Directory only authentication status for a sql server
+    text: az sql server ad-only-auth get --resource-group mygroup --name myServer
+"""
+
 helps['sql server audit-policy'] = """
 type: group
 short-summary: Manage a server's auditing policy.
+"""
+
+helps['sql server audit-policy wait'] = """
+type: command
+short-summary: Place the CLI in a waiting state until a condition of the server's audit policy is met.
+examples:
+  - name: Place the CLI in a waiting state until it determines that server's audit policy exists
+    text: az sql server audit-policy wait -g mygroup -n myserver --exists
 """
 
 helps['sql server audit-policy update'] = """
@@ -924,23 +1170,101 @@ short-summary: Update a server's auditing policy.
 long-summary: If the policy is being enabled, `--storage-account` or both `--storage-endpoint` and `--storage-key` must be specified.
 examples:
   - name: Enable by storage account name.
-    text: az sql server audit-policy update -g mygroup -n myserver --state Enabled --storage-account mystorage
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver --state Enabled \\
+            --bsts Enabled --storage-account mystorage
   - name: Enable by storage endpoint and key.
     text: |
         az sql server audit-policy update -g mygroup -n myserver --state Enabled \\
-            --storage-endpoint https://mystorage.blob.core.windows.net --storage-key MYKEY==
+            --bsts Enabled --storage-endpoint https://mystorage.blob.core.windows.net \\
+            --storage-key MYKEY==
   - name: Set the list of audit actions.
     text: |
         az sql server audit-policy update -g mygroup -n myserver \\
             --actions FAILED_DATABASE_AUTHENTICATION_GROUP 'UPDATE on server::myserver by public'
-  - name: Add an audit action.
-    text: |
-        az sql server audit-policy update -g mygroup -n myserver \\
-            --add auditActionsAndGroups FAILED_DATABASE_AUTHENTICATION_GROUP
-  - name: Remove an audit action by list index.
-    text: az sql server audit-policy update -g mygroup -n myserver --remove auditActionsAndGroups 0
   - name: Disable an auditing policy.
     text: az sql server audit-policy update -g mygroup -n myserver --state Disabled
+  - name: Disable a blob storage auditing policy.
+    text: az sql server audit-policy update -g mygroup -n myserver --bsts Disabled
+  - name: Enable a log analytics auditing policy.
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver --state Enabled \\
+            --lats Enabled --lawri myworkspaceresourceid
+  - name: Disable a log analytics auditing policy.
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver
+            --lats Disabled
+  - name: Enable an event hub auditing policy.
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid \\
+            --event-hub eventhubname
+  - name: Enable an event hub auditing policy for default event hub.
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid
+  - name: Disable an event hub auditing policy.
+    text: |
+        az sql server audit-policy update -g mygroup -n myserver
+            --event-hub-target-state Disabled
+"""
+
+helps['sql server ms-support audit-policy'] = """
+type: group
+short-summary: Manage a server's Microsoft support operations auditing policy.
+"""
+
+helps['sql server ms-support audit-policy wait'] = """
+type: command
+short-summary: Place the CLI in a waiting state until a condition of the server's Microsoft support operations audit policy is met.
+examples:
+  - name: Place the CLI in a waiting state until it determines that server's Microsoft support operations audit policy exists
+    text: az sql server ms-support audit-policy wait -g mygroup -n myserver --exists
+"""
+
+helps['sql server ms-support audit-policy update'] = """
+type: command
+short-summary: Update a server's Microsoft support operations auditing policy.
+long-summary: If the Microsoft support operations policy is being enabled, `--storage-account` or both `--storage-endpoint` and `--storage-key` must be specified.
+examples:
+  - name: Enable by storage account name.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver --state Enabled \\
+            --bsts Enabled --storage-account mystorage
+  - name: Enable by storage endpoint and key.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver --state Enabled \\
+            --bsts Enabled --storage-endpoint https://mystorage.blob.core.windows.net \\
+            --storage-key MYKEY==
+  - name: Disable a Microsoft support operations auditing policy.
+    text: az sql server ms-support audit-policy update -g mygroup -n myserver --state Disabled
+  - name: Disable a blob storage Microsoft support operations auditing policy.
+    text: az sql server ms-support audit-policy update -g mygroup -n myserver --bsts Disabled
+  - name: Enable a log analytics Microsoft support operations auditing policy.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver --state Enabled \\
+            --lats Enabled --lawri myworkspaceresourceid
+  - name: Disable a log analytics Microsoft support operations auditing policy.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver
+            --lats Disabled
+  - name: Enable an event hub Microsoft support operations auditing policy.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid \\
+            --event-hub eventhubname
+  - name: Enable an event hub Microsoft support operations auditing policy for default event hub.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver --state Enabled \\
+            --event-hub-target-state Enabled \\
+            --event-hub-authorization-rule-id eventhubauthorizationruleid
+  - name: Disable an event hub Microsoft support operations auditing policy.
+    text: |
+        az sql server ms-support audit-policy update -g mygroup -n myserver
+            --event-hub-target-state Disabled
 """
 
 helps['sql server conn-policy'] = """
@@ -974,6 +1298,18 @@ examples:
     text: az sql server create -l westus -g mygroup -n myserver -u myadminuser -p myadminpassword
   - name: Create a server with disabled public network access to server.
     text: az sql server create -l westus -g mygroup -n myserver -u myadminuser -p myadminpassword -e false
+  - name: Create a server without SQL Admin, with AD admin and AD Only enabled.
+    text: az sql server create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName --external-admin-sid c5e964e2-6bb2-1111-1111-3b16ec0e1234 -g myResourceGroup -n myServer
+  - name: Create a server without SQL Admin, with AD admin, AD Only enabled, User ManagedIdenties and Identity Type is SystemAssigned,UserAssigned.
+    text: az sql server create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName \\
+              --external-admin-sid c5e964e2-6bb2-1111-1111-3b16ec0e1234 -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type SystemAssigned,UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
+  - name: Create a server without SQL Admin, with AD admin, AD Only enabled, User ManagedIdenties and Identity Type is UserAssigned.
+    text: az sql server create --enable-ad-only-auth --external-admin-principal-type User --external-admin-name myUserName \\
+              --external-admin-sid c5e964e2-6bb2-1111-1111-3b16ec0e1234 -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
 """
 
 helps['sql server dns-alias'] = """
@@ -1072,6 +1408,14 @@ examples:
   - name: Update a server. (autogenerated)
     text: az sql server update --admin-password myadminpassword --name MyAzureSQLServer --resource-group MyResourceGroup
     crafted: true
+  - name: Update a server with User Managed Identies and Identity Type is SystemAssigned,UserAssigned.
+    text: az sql server update -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type SystemAssigned,UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
+  - name: Update a server with User Managed Identies and Identity Type is UserAssigned.
+    text: az sql server update -g myResourceGroup -n myServer -i \\
+              --user-assigned-identity-id /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi \\
+              --identity-type UserAssigned --pid /subscriptions/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/myResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testumi
 """
 
 helps['sql server vnet-rule'] = """
@@ -1199,4 +1543,33 @@ short-summary: Disable sensitivity recommendations for a given column (recommend
 examples:
   - name: Disable sensitivity recommendations for a given column.
     text: az sql db classification recommendation disable -g mygroup -s myserver -n mydb --schema dbo --table mytable --column mycolumn
+"""
+
+helps['sql db ledger-digest-uploads'] = """
+type: group
+short-summary: Manage ledger digest upload settings.
+"""
+
+helps['sql db ledger-digest-uploads enable'] = """
+type: command
+short-summary: Enable uploading ledger digests to an Azure Storage account or to Azure Confidential Ledger. If uploading ledger digests is already enabled, the cmdlet resets the digest storage endpoint to a new value.
+examples:
+  - name: Enable uploading ledger digests to an Azure Blob storage.
+    text: az sql db ledger-digest-uploads enable --name mydb --resource-group MyResourceGroup --server myserver --endpoint https://mystorage.blob.core.windows.net
+"""
+
+helps['sql db ledger-digest-uploads disable'] = """
+type: command
+short-summary: Disable uploading ledger digests.
+examples:
+  - name: Disable uploading ledger digests.
+    text: az sql db ledger-digest-uploads disable --name mydb --resource-group MyResourceGroup --server myserver
+"""
+
+helps['sql db ledger-digest-uploads show'] = """
+type: command
+short-summary: Show the current ledger digest settings.
+examples:
+  - name: Show the settings for uploading ledger digests.
+    text: az sql db ledger-digest-uploads show --name mydb --resource-group MyResourceGroup --server myserver
 """
