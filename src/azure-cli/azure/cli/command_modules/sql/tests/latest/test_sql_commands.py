@@ -742,8 +742,8 @@ class SqlServerServerlessDbMgmtScenarioTest(ScenarioTest):
 
 
 class SqlServerDbOperationMgmtScenarioTest(ScenarioTest):
-    @ResourceGroupPreparer(location='southeastasia')
-    @SqlServerPreparer(location='southeastasia')
+    @ResourceGroupPreparer(location='westeurope')
+    @SqlServerPreparer(location='westeurope')
     def test_sql_db_operation_mgmt(self, resource_group, resource_group_location, server):
         database_name = "cliautomationdb01"
         update_service_objective = 'GP_Gen5_8'
@@ -832,7 +832,9 @@ class SqlServerDbLongTermRetentionScenarioTest(ScenarioTest):
 
         # test update long term retention on live database
         self.cmd(
-            'sql db ltr-policy set -g {rg} -s {server_name} -n {database_name} --weekly-retention {weekly_retention} --monthly-retention {monthly_retention} --yearly-retention {yearly_retention} --week-of-year {week_of_year}',
+            'sql db ltr-policy set -g {rg} -s {server_name} -n {database_name}'
+            ' --weekly-retention {weekly_retention} --monthly-retention {monthly_retention}'
+            ' --yearly-retention {yearly_retention} --week-of-year {week_of_year}',
             checks=[
                 self.check('resourceGroup', '{rg}'),
                 self.check('weeklyRetention', '{weekly_retention}'),
@@ -910,7 +912,8 @@ class SqlServerDbLongTermRetentionScenarioTest(ScenarioTest):
         })
 
         self.cmd(
-            'sql db ltr-backup restore --backup-id \'{backup_id}\' --dest-database {dest_database_name} --dest-server {server_name} --dest-resource-group {rg}',
+            'sql db ltr-backup restore --backup-id \'{backup_id}\' --dest-database {dest_database_name}'
+            ' --dest-server {server_name} --dest-resource-group {rg}',
             checks=[
                 self.check('name', '{dest_database_name}')])
 
@@ -923,7 +926,6 @@ class SqlServerDbLongTermRetentionScenarioTest(ScenarioTest):
 class SqlManagedInstanceOperationMgmtScenarioTest(ScenarioTest):
 
     def test_sql_mi_operation_mgmt(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
         managed_instance_name = self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length)
         admin_login = 'admin123'
         admin_password = 'SecretPassword123'
@@ -936,6 +938,10 @@ class SqlManagedInstanceOperationMgmtScenarioTest(ScenarioTest):
         family = 'Gen5'
         resource_group = "toki"
         user = admin_login
+
+        loc = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
 
         self.kwargs.update({
             'loc': loc,
@@ -958,28 +964,12 @@ class SqlManagedInstanceOperationMgmtScenarioTest(ScenarioTest):
             'delegations': "Microsoft.Sql/managedInstances"
         })
 
-        # Create and prepare VNet and subnet for new virtual cluster
-        self.cmd('network route-table create -g {resource_group} -n {route_table_name} -l {loc}')
-        self.cmd('network route-table show -g {resource_group} -n {route_table_name}')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_default} --next-hop-type Internet --address-prefix 0.0.0.0/0')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_subnet_to_vnet_local} --next-hop-type VnetLocal --address-prefix 10.0.0.0/24')
-        self.cmd('network vnet update -g {resource_group} -n {vnet_name} --address-prefix 10.0.0.0/16')
-        self.cmd('network vnet subnet update -g {resource_group} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name}')
-        self.cmd('network vnet subnet update -g {resource_group} --vnet-name {vnet_name} -n {subnet_name} --delegations {delegations} ')
-        subnet = self.cmd('network vnet subnet show -g {resource_group} --vnet-name {vnet_name} -n {subnet_name}').get_output_in_json()
-
-        print('Creating subnet...\n')
-
-        self.kwargs.update({
-            'subnet_id': subnet['id']
-        })
-
         print('Creating MI...\n')
 
         # Create sql managed_instance
         self.cmd('sql mi create -g {} -n {} -l {} '
                  '-u {} -p {} --subnet {} --license-type {} --capacity {} --storage {} --edition {} --family {}'
-                 .format(resource_group, managed_instance_name, loc, user, admin_password, subnet['id'], license_type, v_cores, storage_size_in_gb, edition, family),
+                 .format(resource_group, managed_instance_name, loc, user, admin_password, subnet, license_type, v_cores, storage_size_in_gb, edition, family),
                  checks=[
                      JMESPathCheck('name', managed_instance_name),
                      JMESPathCheck('resourceGroup', resource_group),
@@ -1044,6 +1034,7 @@ class AzureActiveDirectoryAdministratorScenarioTest(ScenarioTest):
         self.kwargs.update({
             'rg': resource_group,
             'sn': server,
+            'administrator_name': "ActiveDirectory",
             'oid': '5e90ef3b-9b42-4777-819b-25c36961ea4d',
             'oid2': 'e4d43337-d52c-4a0c-b581-09055e0359a0',
             'user': 'DSEngAll',
@@ -1062,12 +1053,13 @@ class AzureActiveDirectoryAdministratorScenarioTest(ScenarioTest):
                      self.check('[0].login', '{user}'),
                      self.check('[0].sid', '{oid}')])
 
-        self.cmd('sql server ad-admin update -s {sn} -g {rg} -u {user2} -i {oid2}',
+        self.cmd('sql server ad-admin update -s {sn} -g {rg} --administrator-name {administrator_name}'
+                 ' -u {user2} -i {oid2}',
                  checks=[
                      self.check('login', '{user2}'),
                      self.check('sid', '{oid2}')])
 
-        self.cmd('sql server ad-admin delete -s {sn} -g {rg}')
+        self.cmd('sql server ad-admin delete -s {sn} -g {rg} --administrator-name {administrator_name}')
 
         self.cmd('sql server ad-admin list -s {sn} -g {rg}',
                  checks=[
@@ -1119,10 +1111,10 @@ class SqlManagedInstanceAzureActiveDirectoryAdministratorScenarioTest(ScenarioTe
 
 
 class SqlServerDbCopyScenarioTest(ScenarioTest):
-    @ResourceGroupPreparer(parameter_name='resource_group_1', location='southeastasia')
-    @ResourceGroupPreparer(parameter_name='resource_group_2', location='southeastasia')
-    @SqlServerPreparer(parameter_name='server1', resource_group_parameter_name='resource_group_1', location='southeastasia')
-    @SqlServerPreparer(parameter_name='server2', resource_group_parameter_name='resource_group_2', location='southeastasia')
+    @ResourceGroupPreparer(parameter_name='resource_group_1', location='westeurope')
+    @ResourceGroupPreparer(parameter_name='resource_group_2', location='westeurope')
+    @SqlServerPreparer(parameter_name='server1', resource_group_parameter_name='resource_group_1', location='westeurope')
+    @SqlServerPreparer(parameter_name='server2', resource_group_parameter_name='resource_group_2', location='westeurope')
     @AllowLargeResponse()
     def test_sql_db_copy(self, resource_group_1, resource_group_2,
                          resource_group_location,
@@ -1309,8 +1301,8 @@ class SqlServerDbRestoreScenarioTest(ScenarioTest):
 
 
 class SqlServerDbRestoreDeletedScenarioTest(ScenarioTest):
-    @ResourceGroupPreparer(location='southeastasia')
-    @SqlServerPreparer(location='southeastasia')
+    @ResourceGroupPreparer(location='westeurope')
+    @SqlServerPreparer(location='westeurope')
     @AllowLargeResponse()
     def test_sql_db_restore_deleted(self, resource_group, resource_group_location, server):
         database_name = 'cliautomationdb01'
@@ -1477,7 +1469,7 @@ class SqlServerDbSecurityScenarioTest(ScenarioTest):
         email_addresses_expected = ['test1@example.com','test2@example.com']
         email_account_admins = True
 
-        self.cmd('sql db threat-policy update -g {} -s {} -n {}'
+        self.cmd('sql db threat-policy update -g {} -s {} -n {} --security-alert-policy-name default'
                  ' --state {} --storage-key {} --storage-endpoint {}'
                  ' --retention-days {} --email-addresses {} --disabled-alerts {}'
                  ' --email-account-admins {}'
@@ -1496,7 +1488,8 @@ class SqlServerDbSecurityScenarioTest(ScenarioTest):
 
         # update threat policy - specify storage account and resource group. use secondary key
         key_2 = self._get_storage_key(storage_account_2, resource_group_2)
-        self.cmd('sql db threat-policy update -g {} -s {} -n {} --storage-account {}'
+        self.cmd('sql db threat-policy update -g {} -s {} -n {} --security-alert-policy-name default'
+                 ' --storage-account {}'
                  .format(resource_group, server, database_name, storage_account_2),
                  checks=[
                      JMESPathCheck('resourceGroup', resource_group),
@@ -2245,19 +2238,19 @@ class SqlServerDbReplicaMgmtScenarioTest(ScenarioTest):
     # create 2 servers in the same resource group, and 1 server in a different resource group
     @ResourceGroupPreparer(parameter_name="resource_group_1",
                            parameter_name_for_location="resource_group_location_1",
-                           location='southeastasia')
+                           location='westeurope')
     @ResourceGroupPreparer(parameter_name="resource_group_2",
                            parameter_name_for_location="resource_group_location_2",
-                           location='southeastasia')
+                           location='westeurope')
     @SqlServerPreparer(parameter_name="server_name_1",
                        resource_group_parameter_name="resource_group_1",
-                       location='southeastasia')
+                       location='westeurope')
     @SqlServerPreparer(parameter_name="server_name_2",
                        resource_group_parameter_name="resource_group_1",
-                       location='southeastasia')
+                       location='westeurope')
     @SqlServerPreparer(parameter_name="server_name_3",
                        resource_group_parameter_name="resource_group_2",
-                       location='southeastasia')
+                       location='westeurope')
     @AllowLargeResponse()
     def test_sql_db_replica_mgmt(self,
                                  resource_group_1, resource_group_location_1,
@@ -2828,8 +2821,8 @@ class SqlElasticPoolOperationMgmtScenarioTest(ScenarioTest):
         super(SqlElasticPoolOperationMgmtScenarioTest, self).__init__(method_name)
         self.pool_name = "operationtestep1"
 
-    @ResourceGroupPreparer(location='southeastasia')
-    @SqlServerPreparer(location='southeastasia')
+    @ResourceGroupPreparer(location='westeurope')
+    @SqlServerPreparer(location='westeurope')
     @AllowLargeResponse()
     def test_sql_elastic_pool_operation_mgmt(self, resource_group, resource_group_location, server):
         edition = 'Premium'
@@ -3115,26 +3108,22 @@ class SqlServerImportExportMgmtScenarioTest(ScenarioTest):
                  ' --storage-uri {}'
                  .format(server, db_name, resource_group, admin_password, admin_login, storageKey, bacpacUri),
                  checks=[
-                     # remove this check since there is an issue in getting properties and the fix is being deployed currently
-                     # JMESPathCheck('blobUri', bacpacUri),
-                     # JMESPathCheck('databaseName', db_name),
-                     # JMESPathCheck('requestType', 'Export'),
-                     # JMESPathCheck('resourceGroup', resource_group),
-                     # JMESPathCheck('serverName', server),
-                     JMESPathCheck('status', 'Succeeded')])
+                     JMESPathCheck('blobUri', bacpacUri),
+                     JMESPathCheck('databaseName', db_name),
+                     JMESPathCheck('requestType', 'ExportDatabase'),
+                     JMESPathCheck('serverName', server),
+                     JMESPathCheck('status', 'Completed')])
 
         self.cmd('sql db export -s {} -n {} -g {} -p {} -u {}'
                  ' --storage-key {} --storage-key-type SharedAccessKey'
                  ' --storage-uri {}'
                  .format(server, db_name, resource_group, admin_password, admin_login, sasKey, bacpacUri2),
                  checks=[
-                     # remove this check since there is an issue in getting properties and the fix is being deployed currently
-                     # JMESPathCheck('blobUri', bacpacUri2),
-                     # JMESPathCheck('databaseName', db_name),
-                     # JMESPathCheck('requestType', 'Export'),
-                     # JMESPathCheck('resourceGroup', resource_group),
-                     # JMESPathCheck('serverName', server),
-                     JMESPathCheck('status', 'Succeeded')])
+                     JMESPathCheck('blobUri', bacpacUri2),
+                     JMESPathCheck('databaseName', db_name),
+                     JMESPathCheck('requestType', 'ExportDatabase'),
+                     JMESPathCheck('serverName', server),
+                     JMESPathCheck('status', 'Completed')])
 
         # import bacpac to second database using Storage Key
         self.cmd('sql db import -s {} -n {} -g {} -p {} -u {}'
@@ -3142,14 +3131,11 @@ class SqlServerImportExportMgmtScenarioTest(ScenarioTest):
                  ' --storage-uri {}'
                  .format(server, db_name2, resource_group, admin_password, admin_login, storageKey, bacpacUri),
                  checks=[
-                     # Uncomment this when bug in backend is fixed
-                     # JMESPathCheck('blobUri', bacpacUri),
-                     # JMESPathCheck('databaseName', db_name2),
-                     # JMESPathCheck('name', 'import'),
-                     # JMESPathCheck('requestType', 'Import'),
-                     # JMESPathCheck('resourceGroup', resource_group),
-                     # JMESPathCheck('serverName', server),
-                     JMESPathCheck('status', 'Succeeded')])
+                     JMESPathCheck('blobUri', bacpacUri),
+                     JMESPathCheck('databaseName', db_name2),
+                     JMESPathCheck('requestType', 'ImportToExistingDatabase'),
+                     JMESPathCheck('serverName', server),
+                     JMESPathCheck('status', 'Completed')])
 
         # import bacpac to third database using SAS key
         self.cmd('sql db import -s {} -n {} -g {} -p {} -u {}'
@@ -3157,14 +3143,11 @@ class SqlServerImportExportMgmtScenarioTest(ScenarioTest):
                  ' --storage-uri {}'
                  .format(server, db_name3, resource_group, admin_password, admin_login, sasKey, bacpacUri2),
                  checks=[
-                     # Uncomment this when bug in backend is fixed
-                     # JMESPathCheck('blobUri', bacpacUri2),
-                     # JMESPathCheck('databaseName', db_name3),
-                     # JMESPathCheck('name', 'import'),
-                     # JMESPathCheck('requestType', 'Import'),
-                     # JMESPathCheck('resourceGroup', resource_group),
-                     # JMESPathCheck('serverName', server),
-                     JMESPathCheck('status', 'Succeeded')])
+                     JMESPathCheck('blobUri', bacpacUri2),
+                     JMESPathCheck('databaseName', db_name3),
+                     JMESPathCheck('requestType', 'ImportToExistingDatabase'),
+                     JMESPathCheck('serverName', server),
+                     JMESPathCheck('status', 'Completed')])
 
 
 class SqlServerConnectionStringScenarioTest(ScenarioTest):
@@ -3907,7 +3890,7 @@ class SqlServerTrustGroupsScenarioTest(ScenarioTest):
     @AllowLargeResponse()
     @ResourceGroupPreparer(location='westeurope', name_prefix='clitest')
     def test_sql_server_trust_groups(self):
-        self.skipTest("Skipping based on discussion with owning team - Matija Bojovic")
+        # self.skipTest("Skipping based on discussion with owning team - Matija Bojovic")
 
         resource_prefix = 'sqlstg'
 
@@ -4012,6 +3995,62 @@ class SqlServerTrustGroupsScenarioTest(ScenarioTest):
         self.cmd('az sql stg delete -g {rg} -l {loc} -n {stg_name} --yes')
 
 
+# This test check creation of MI with maintenance configuration that is not default one
+class SqlManagedInstanceCustomMaintenanceWindow(ScenarioTest):
+    MMI1 = "SQL_NorthEurope_MI_1"
+    def _get_full_maintenance_id(self, name):
+        return "/subscriptions/{}/providers/Microsoft.Maintenance/publicMaintenanceConfigurations/{}".format(self.get_subscription_id(), name)
+
+    def test_sql_managed_instance_cmw(self):
+        # Values of existing resources in order to test this feature
+        loc = 'northeurope'
+        resource_group = 'northeutest'
+        subnet = '/subscriptions/a295933f-f7f5-4994-a109-8fa51241a5d6/resourceGroups/northeutest/providers/Microsoft.Network/virtualNetworks/vnet-ivkulezi/subnets/ManagedInstance'
+        ####
+
+        self.kwargs.update({
+            'loc': loc,
+            'rg' : resource_group,
+            'subnet': subnet,
+            'managed_instance_name': self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length),
+            'username': 'admin123',
+            'admin_password': 'SecretPassword123',
+            'timezone_id': 'Central European Standard Time',
+            'license_type': 'LicenseIncluded',
+            'v_cores': 8,
+            'storage_size_in_gb': '128',
+            'edition': 'GeneralPurpose',
+            'family': 'Gen5',
+            'collation': "Serbian_Cyrillic_100_CS_AS",
+            'proxy_override': "Proxy",
+            'maintenance_id': self._get_full_maintenance_id(self.MMI1)
+        })
+
+        # test create sql managed_instance with FMW
+        managed_instance = self.cmd('sql mi create -g {rg} -n {managed_instance_name} -l {loc} '
+                                      '-u {username} -p {admin_password} --subnet {subnet} --license-type {license_type} --capacity {v_cores} '
+                                      '--storage {storage_size_in_gb} --edition {edition} --family {family} --collation {collation} '
+                                      '--proxy-override {proxy_override} --public-data-endpoint-enabled --timezone-id "{timezone_id}" --maint-config-id "{maintenance_id}"',
+                                      checks=[
+                                        self.check('name', '{managed_instance_name}'),
+                                        self.check('resourceGroup', '{rg}'),
+                                        self.check('administratorLogin', '{username}'),
+                                        self.check('vCores', '{v_cores}'),
+                                        self.check('storageSizeInGb', '{storage_size_in_gb}'),
+                                        self.check('licenseType', '{license_type}'),
+                                        self.check('sku.tier', '{edition}'),
+                                        self.check('sku.family', '{family}'),
+                                        self.check('sku.capacity', '{v_cores}'),
+                                        self.check('identity', None),
+                                        self.check('collation', '{collation}'),
+                                        self.check('proxyOverride', '{proxy_override}'),
+                                        self.check('publicDataEndpointEnabled', 'True'),
+                                        self.check('maintenanceConfigurationId', self._get_full_maintenance_id(self.MMI1))]).get_output_in_json()
+
+        # test delete sql managed instance 2
+        self.cmd('sql mi delete --ids {} --yes'
+                 .format(managed_instance['id']), checks=NoneCheck())
+
 class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
 
     DEFAULT_MC = "SQL_Default"
@@ -4022,7 +4061,6 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
 
     @AllowLargeResponse()
     def test_sql_managed_instance_mgmt(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
         managed_instance_name_1 = self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length)
         admin_login = 'admin123'
         admin_passwords = ['SecretPassword123', 'SecretPassword456']
@@ -4046,6 +4084,10 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
         backup_storage_redundancy = "Local"
         backup_storage_redundancy_internal = "LRS"
         user = admin_login
+
+        loc = 'westcentralus'
+        resource_group_1 = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
 
         # test create sql managed_instance
         managed_instance_1 = self.cmd('sql mi create -g {} -n {} -l {} '
@@ -4071,27 +4113,6 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
                                           JMESPathCheck('storageAccountType', backup_storage_redundancy_internal),
                                           JMESPathCheck('maintenanceConfigurationId', self._get_full_maintenance_id(self.DEFAULT_MC))]).get_output_in_json()
 
-        managed_instance_name_2 = self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length)
-
-        # test create sql managed_instance with FMW
-        managed_instance_2 = self.cmd('sql mi create -g {} -n {} -l {} '
-                                      '-u {} -p {} --subnet {} --license-type {} --capacity {} --storage {} --edition {} --family {} --collation {} --proxy-override {} --public-data-endpoint-enabled --timezone-id "{}" --maint-config-id "{}"'
-                                      .format(resource_group_1, managed_instance_name_2, loc, user, admin_passwords[0], subnet, license_type, v_cores, storage_size_in_gb, edition, families[0], collation, proxy_override, timezone_id, self.MMI1),
-                                      checks=[
-                                          JMESPathCheck('resourceGroup', resource_group_1),
-                                          JMESPathCheck('name', managed_instance_name_2),
-                                          JMESPathCheck('administratorLogin', user),
-                                          JMESPathCheck('licenseType', license_type),
-                                          JMESPathCheck('vCores', v_cores),
-                                          JMESPathCheck('storageSizeInGb', storage_size_in_gb),
-                                          JMESPathCheck('sku.tier', edition),
-                                          JMESPathCheck('sku.family', families[0]),
-                                          JMESPathCheck('collation', collation),
-                                          JMESPathCheck('proxyOverride', proxy_override),
-                                          JMESPathCheck('publicDataEndpointEnabled', 'True'),
-                                          JMESPathCheck('timezoneId', timezone_id),
-                                          JMESPathCheck('maintenanceConfigurationId', self._get_full_maintenance_id(self.MMI1))]).get_output_in_json()
-
         # test show sql managed instance 1
         self.cmd('sql mi show -g {} -n {}'
                  .format(resource_group_1, managed_instance_name_1),
@@ -4101,7 +4122,7 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
                      JMESPathCheck('administratorLogin', user)])
 
         # test show sql managed instance 1 using id
-        self.cmd('sql mi show --id {}'
+        self.cmd('sql mi show --ids {}'
                  .format(managed_instance_1['id']),
                  checks=[
                      JMESPathCheck('name', managed_instance_name_1),
@@ -4119,8 +4140,8 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
                      JMESPathCheck('administratorLogin', user)])
 
         # test update without identity parameter, validate identity still exists
-        # also use --id instead of -g/-n
-        self.cmd('sql mi update --id {} --admin-password {}'
+        # also use --ids instead of -g/-n
+        self.cmd('sql mi update --ids {} --admin-password {}'
                  .format(managed_instance_1['id'], admin_passwords[0]),
                  checks=[
                      JMESPathCheck('name', managed_instance_name_1),
@@ -4184,12 +4205,8 @@ class SqlManagedInstanceMgmtScenarioTest(ScenarioTest):
         self.cmd('sql mi list', checks=[JMESPathCheckGreaterThan('length(@)', 0)])
 
         # test delete sql managed instance 1
-        self.cmd('sql mi delete --id {} --yes'
+        self.cmd('sql mi delete --ids {} --yes'
                  .format(managed_instance_1['id']), checks=NoneCheck())
-
-        # test delete sql managed instance 2
-        self.cmd('sql mi delete --id {} --yes'
-                 .format(managed_instance_2['id']), checks=NoneCheck())
 
         # test show sql managed instance doesn't return anything
         self.cmd('sql mi show -g {} -n {}'
@@ -4265,7 +4282,6 @@ class SqlManagedInstanceMgmtScenarioIdentityTest(ScenarioTest):
 class SqlManagedInstancePoolScenarioTest(ScenarioTest):
     @record_only()
     def test_sql_instance_pool(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
         print("Starting instance pool tests")
         instance_pool_name_1 = self.create_random_name(instance_pool_name_prefix, managed_instance_name_max_length)
         instance_pool_name_2 = self.create_random_name(instance_pool_name_prefix, managed_instance_name_max_length)
@@ -4275,9 +4291,10 @@ class SqlManagedInstancePoolScenarioTest(ScenarioTest):
         edition = 'GeneralPurpose'
         family = 'Gen5'
         resource_group = 'billingPools'
-        vnet_name = 'vnet-billingPool1'
-        subnet_name = 'InstancePool'
-        subnet = self.cmd('network vnet subnet show -g {} --vnet-name {} -n {}'.format(resource_group, vnet_name, subnet_name)).get_output_in_json()['id']
+
+        location = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
         num_pools = len(self.cmd('sql instance-pool list -g {}'.format(resource_group)).get_output_in_json())
 
         # test create sql managed_instance
@@ -4486,11 +4503,14 @@ class SqlManagedInstanceTransparentDataEncryptionScenarioTest(ScenarioTest):
 class SqlManagedInstanceDbShortTermRetentionScenarioTest(ScenarioTest):
     @ResourceGroupPreparer(random_name_length=17, name_prefix='clitest')
     def test_sql_managed_db_short_retention(self, resource_group, resource_group_location):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
         resource_prefix = 'MIDBShortTermRetention'
 
+        loc = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
+
         self.kwargs.update({
-            'loc': "westeurope",
+            'loc':loc,
             'vnet_name': 'MIVirtualNetwork',
             'subnet_name': 'ManagedInsanceSubnet',
             'route_table_name': 'vcCliTestRouteTable',
@@ -4510,11 +4530,11 @@ class SqlManagedInstanceDbShortTermRetentionScenarioTest(ScenarioTest):
             'proxy_override': "Proxy",
             'retention_days_inc': 14,
             'retention_days_dec': 7,
-            'rg': 'v-urmila'
+            'rg': resource_group
         })
 
         self.kwargs.update({
-            'subnet_id': '/subscriptions/a8c9a924-06c0-4bde-9788-e7b1370969e1/resourceGroups/v-urmila/providers/Microsoft.Network/virtualNetworks/MIVirtualNetwork/subnets/ManagedInsanceSubnet'
+            'subnet_id': subnet
         })
 
         # create sql managed_instance
@@ -4589,12 +4609,12 @@ class SqlManagedInstanceDbShortTermRetentionScenarioTest(ScenarioTest):
 class SqlManagedInstanceDbLongTermRetentionScenarioTest(ScenarioTest):
     def test_sql_managed_db_long_term_retention(
             self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+        
         self.kwargs.update({
-            'rg': 'v-urmila',
-            'loc': 'westeurope',
-            'managed_instance_name': 'v-urmila-mi-test',
-            'database_name': 'ReportServer',
+            'rg': 'westcentralus',
+            'loc': 'autobot-managed-instance-v12',
+            'managed_instance_name': 'autobot-managed-instance-v12',
+            'database_name': 'autobot-managed-database-v12',
             'weekly_retention': 'P1W',
             'monthly_retention': 'P1M',
             'yearly_retention': 'P2M',
@@ -4701,14 +4721,18 @@ class SqlManagedInstanceDbLongTermRetentionScenarioTest(ScenarioTest):
 
 
 class SqlManagedInstanceRestoreDeletedDbScenarioTest(ScenarioTest):
-    @ResourceGroupPreparer(random_name_length=17, name_prefix='clitest')
-    def test_sql_managed_deleted_db_restore(self, resource_group, resource_group_location):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+    #@ResourceGroupPreparer(random_name_length=17, name_prefix='clitest')
+    def test_sql_managed_deleted_db_restore(self):
+        
         resource_prefix = 'MIRestoreDeletedDB'
 
+        loc = 'westcentralus'
+        resource_group_1 = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
+
         self.kwargs.update({
-            'loc': 'westeurope',
-            'rg': 'DejanDuVnetRG',
+            'loc': loc,
+            'rg': resource_group_1,
             'vnet_name': 'vcCliTestVnetRestoreDel',
             'subnet_name': 'vcCliTestSubnetRestoreDel',
             'route_table_name': 'vcCliTestRouteTableRestoreDel',
@@ -4731,16 +4755,8 @@ class SqlManagedInstanceRestoreDeletedDbScenarioTest(ScenarioTest):
             'retention_days_dec': 7
         })
 
-        # Create and prepare VNet and subnet for new virtual cluster
-        self.cmd('network route-table create -g {rg} -n {route_table_name} -l {loc}')
-        self.cmd('network route-table route create -g {rg} --route-table-name {route_table_name} -n {route_name_internet} --next-hop-type Internet --address-prefix 0.0.0.0/0')
-        self.cmd('network route-table route create -g {rg} --route-table-name {route_table_name} -n {route_name_vnetlocal} --next-hop-type VnetLocal --address-prefix 10.0.0.0/24')
-        self.cmd('network vnet update -g {rg} -n {vnet_name} --address-prefix 10.0.0.0/16')
-        self.cmd('network vnet subnet update -g {rg} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name}')
-        subnet = self.cmd('network vnet subnet show -g {rg} --vnet-name {vnet_name} -n {subnet_name}').get_output_in_json()
-
         self.kwargs.update({
-            'subnet_id': subnet['id']
+            'subnet_id': subnet
         })
 
         # create sql managed_instance
@@ -4798,7 +4814,7 @@ class SqlManagedInstanceRestoreDeletedDbScenarioTest(ScenarioTest):
 class SqlManagedInstanceDbMgmtScenarioTest(ScenarioTest):
 
     def test_sql_managed_db_mgmt(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+        
         database_name = "cliautomationdb01"
         database_name_restored = "restoredcliautomationdb01"
 
@@ -4806,15 +4822,15 @@ class SqlManagedInstanceDbMgmtScenarioTest(ScenarioTest):
         admin_login = 'admin123'
         admin_passwords = ['SecretPassword123', 'SecretPassword456']
 
-        subnet = '/subscriptions/8fb1ad69-28b1-4046-b50f-43999c131722/resourceGroups/toki/providers/Microsoft.Network/virtualNetworks/vcCliTestVnet1/subnets/vcCliTestSubnet1'
+        loc = 'westcentralus'
+        resource_group_1 = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
 
         license_type = 'LicenseIncluded'
-        loc = 'westeurope'
         v_cores = 4
         storage_size_in_gb = '128'
         edition = 'GeneralPurpose'
         family = 'Gen5'
-        resource_group_1 = "toki"
         collation = "Latin1_General_100_CS_AS_SC"
         user = admin_login
 
@@ -4870,7 +4886,7 @@ class SqlManagedInstanceDbMgmtScenarioTest(ScenarioTest):
                      JMESPathCheck('status', 'Online')])
 
         # Show by id
-        self.cmd('sql midb show --id {}'
+        self.cmd('sql midb show --ids {}'
                  .format(db1['id']),
                  checks=[
                      JMESPathCheck('name', database_name_restored),
@@ -4889,7 +4905,7 @@ class SqlManagedInstanceDbMgmtScenarioTest(ScenarioTest):
                  .format(resource_group_1, managed_instance_name_1, database_name),
                  expect_failure=True)
 
-        self.cmd('sql mi delete --id {} --yes'
+        self.cmd('sql mi delete --ids {} --yes'
                  .format(managed_instance_1['id']), checks=NoneCheck())
 
 
@@ -5166,10 +5182,13 @@ class SqlFailoverGroupMgmtScenarioTest(ScenarioTest):
 class SqlVirtualClusterMgmtScenarioTest(ScenarioTest):
 
     def test_sql_virtual_cluster_mgmt(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+        loc = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
+
         self.kwargs.update({
-            'rg': 'DejanDuVnetRG',
-            'loc': 'westeurope',
+            'rg': resource_group,
+            'loc': loc,
             'vnet_name': 'vcCliTestVnet7',
             'subnet_name': 'vcCliTestSubnet7',
             'route_table_name': 'vcCliTestRouteTable7',
@@ -5188,17 +5207,8 @@ class SqlVirtualClusterMgmtScenarioTest(ScenarioTest):
             'delegations': "Microsoft.Sql/managedInstances"
         })
 
-        # Create and prepare VNet and subnet for new virtual cluster
-        self.cmd('network route-table create -g {rg} -n {route_table_name} -l {loc}')
-        self.cmd('network route-table route create -g {rg} --route-table-name {route_table_name} -n {route_name_internet} --next-hop-type Internet --address-prefix 0.0.0.0/0')
-        self.cmd('network route-table route create -g {rg} --route-table-name {route_table_name} -n {route_name_vnetlocal} --next-hop-type VnetLocal --address-prefix 10.0.0.0/24')
-        self.cmd('network vnet update -g {rg} -n {vnet_name} --address-prefix 10.0.0.0/16')
-        self.cmd('network vnet subnet update -g {rg} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name}')
-        self.cmd('network vnet subnet update -g {rg} --vnet-name {vnet_name} -n {subnet_name} --delegations {delegations} ')
-        subnet = self.cmd('network vnet subnet show -g {rg} --vnet-name {vnet_name} -n {subnet_name}').get_output_in_json()
-
         self.kwargs.update({
-            'subnet_id': subnet['id']
+            'subnet_id': subnet
         })
 
         # create sql managed_instance
@@ -5221,11 +5231,16 @@ class SqlVirtualClusterMgmtScenarioTest(ScenarioTest):
                      self.check('proxyOverride', '{proxy_override}'),
                      self.check('publicDataEndpointEnabled', 'True')])
 
+        if not (self.in_recording or self.is_live):
+            self.kwargs.update({
+                'subnet_id':  subnet.replace("4b9746e4-d324-4e1d-be53-ec3c8f3a0c18", "00000000-0000-0000-0000-000000000000")
+            })
+
         # test list sql virtual cluster in the subscription, should be at least 1
         virtual_clusters = self.cmd('sql virtual-cluster list',
                                     checks=[
                                         self.greater_than('length(@)', 0),
-                                        self.check('length([?subnetId == \'{subnet_id}\'])', 1),
+                                        self.greater_than('length([?subnetId == \'{subnet_id}\'])', 1),
                                         self.check('[?subnetId == \'{subnet_id}\'].location | [0]', '{loc}'),
                                         self.check('[?subnetId == \'{subnet_id}\'].resourceGroup | [0]', '{rg}')])
 
@@ -5233,7 +5248,7 @@ class SqlVirtualClusterMgmtScenarioTest(ScenarioTest):
         virtual_clusters = self.cmd('sql virtual-cluster list -g {rg}',
                                     checks=[
                                         self.greater_than('length(@)', 0),
-                                        self.check('length([?subnetId == \'{subnet_id}\'])', 1),
+                                        self.greater_than('length([?subnetId == \'{subnet_id}\'])', 1),
                                         self.check('[?subnetId == \'{subnet_id}\'].location | [0]', '{loc}'),
                                         self.check('[?subnetId == \'{subnet_id}\'].resourceGroup | [0]', '{rg}')]).get_output_in_json()
 
@@ -5254,21 +5269,14 @@ class SqlVirtualClusterMgmtScenarioTest(ScenarioTest):
         # delete sql managed instance
         self.cmd('sql mi delete -g {rg} -n {managed_instance_name} --yes', checks=NoneCheck())
 
-        # test delete sql virtual cluster
-        self.cmd('sql virtual-cluster delete -g {rg} -n {vc_name}', checks=NoneCheck())
-
-        # test show sql virtual cluster doesn't return anything
-        self.cmd('sql virtual-cluster show -g {rg} -n {vc_name}', expect_failure=True)
-
-
 class SqlInstanceFailoverGroupMgmtScenarioTest(ScenarioTest):
     def test_sql_instance_failover_group_mgmt(self):
-        managed_instance_name_1 = "mifoge"
-        managed_instance_name_2 = "migogw"
-        resource_group_name = "auto-failover-group"
+        managed_instance_name_1 = "autobot-primary-managed-instance-v12"
+        managed_instance_name_2 = "autobot-secondary-managed-instance-secondary-v12"
+        resource_group_name = "autobot-managed-instance-v12"
         failover_group_name = "fgtest2020a"
-        mi1_location = "eastus"
-        mi2_location = "westus"
+        mi1_location = "westcentralus"
+        mi2_location = "eastus"
 
         # Create Failover Group
         self.cmd('sql instance-failover-group create -n {} -g {} --mi {} --partner-resource-group {} --partner-mi {} --failover-policy Automatic --grace-period 2'
@@ -5403,7 +5411,7 @@ class SqlDbSensitivityClassificationsScenarioTest(ScenarioTest):
     @StorageAccountPreparer(location='eastus2')
     def test_sql_db_sensitivity_classifications(self, resource_group, resource_group_location, server, storage_account):
         from azure.mgmt.sql.models import SampleName
-        self.skipTest("Skipping based on discussion with owning team - ranisha")
+        # self.skipTest("Skipping based on discussion with owning team - ranisha")
         database_name = "sensitivityclassificationsdb01"
 
         # create db
@@ -5433,7 +5441,7 @@ class SqlDbSensitivityClassificationsScenarioTest(ScenarioTest):
         state_enabled = 'Enabled'
         retention_days = 30
 
-        self.cmd('sql db threat-policy update -g {} -s {} -n {}'
+        self.cmd('sql db threat-policy update -g {} -s {} -n {} --security-alert-policy-name default'
                  ' --state {} --storage-key {} --storage-endpoint {}'
                  ' --retention-days {} --email-addresses {} --disabled-alerts {}'
                  ' --email-account-admins {}'
@@ -5558,7 +5566,7 @@ class SqlServerMinimalTlsVersionScenarioTest(ScenarioTest):
 class SqlManagedInstanceFailoverScenarionTest(ScenarioTest):
 
     def test_sql_mi_failover_mgmt(self):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+        
         managed_instance_name = self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length)
         admin_login = 'admin123'
         admin_password = 'SecretPassword123'
@@ -5571,6 +5579,11 @@ class SqlManagedInstanceFailoverScenarionTest(ScenarioTest):
         family = 'Gen5'
         resource_group = "DejanDuVnetRG"
         user = admin_login
+
+        # override
+        loc = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
 
         self.kwargs.update({
             'loc': loc,
@@ -5591,25 +5604,14 @@ class SqlManagedInstanceFailoverScenarionTest(ScenarioTest):
             'proxy_override': "Proxy"
         })
 
-        # Create and prepare VNet and subnet for new virtual cluster
-        self.cmd('network route-table create -g {resource_group} -n {route_table_name} -l {loc}')
-        self.cmd('network route-table show -g {resource_group} -n {route_table_name}')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_default} --next-hop-type Internet --address-prefix 0.0.0.0/0')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_subnet_to_vnet_local} --next-hop-type VnetLocal --address-prefix 10.0.0.0/24')
-        self.cmd('network vnet update -g {resource_group} -n {vnet_name} --address-prefix 10.0.0.0/16')
-        self.cmd('network vnet subnet update -g {resource_group} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name} --delegations Microsoft.Sql/managedInstances',
-                 checks=self.check('delegations[0].serviceName', 'Microsoft.Sql/managedInstances'))
-
-        subnet = self.cmd('network vnet subnet show -g {resource_group} --vnet-name {vnet_name} -n {subnet_name}').get_output_in_json()
-
         self.kwargs.update({
-            'subnet_id': subnet['id']
+            'subnet_id': subnet
         })
 
         # Create sql managed_instance
         self.cmd('sql mi create -g {} -n {} -l {} '
                  '-u {} -p {} --subnet {} --license-type {} --capacity {} --storage {} --edition {} --family {}'
-                 .format(resource_group, managed_instance_name, loc, user, admin_password, subnet['id'], license_type, v_cores, storage_size_in_gb, edition, family),
+                 .format(resource_group, managed_instance_name, loc, user, admin_password, subnet, license_type, v_cores, storage_size_in_gb, edition, family),
                  checks=[
                      JMESPathCheck('name', managed_instance_name),
                      JMESPathCheck('resourceGroup', resource_group),
@@ -5622,20 +5624,31 @@ class SqlManagedInstanceFailoverScenarionTest(ScenarioTest):
                      JMESPathCheck('sku.capacity', v_cores),
                      JMESPathCheck('identity', None)]).get_output_in_json()
 
+        # Wait for 5 minutes so that first full backup is created
+        if self.in_recording or self.is_live:
+            sleep(5*60)
+
         # Failover managed instance primary replica
         self.cmd('sql mi failover -g {resource_group} -n {managed_instance_name}', checks=NoneCheck())
+
+        self.cmd('sql mi delete -g {resource_group} -n {managed_instance_name} --yes', checks=NoneCheck())
 
 
 class SqlManagedDatabaseLogReplayScenarionTest(ScenarioTest):
     @AllowLargeResponse()
-    @ResourceGroupPreparer(random_name_length=28, name_prefix='clitest-logreplay', location='westcentralus')
-    def test_sql_midb_logreplay_mgmt(self, resource_group, resource_group_location):
-        self.skipTest("Skipping based on discussion with owning team - mibrkic")
+    #@ResourceGroupPreparer(random_name_length=28, name_prefix='clitest-logreplay', location='westcentralus')
+    def test_sql_midb_logreplay_mgmt(self):
+        
         managed_instance_name = self.create_random_name(managed_instance_name_prefix, managed_instance_name_max_length)
         account = self.cmd('account show').get_output_in_json()
 
+
+        loc = 'westcentralus'
+        resource_group = 'autobot-managed-instance-v12'
+        subnet = '/subscriptions/4b9746e4-d324-4e1d-be53-ec3c8f3a0c18/resourceGroups/autobot-managed-instance-v12/providers/Microsoft.Network/virtualNetworks/autobot-managed-instance-vnet/subnets/clsubnet'
+
         self.kwargs.update({
-            'loc': resource_group_location,
+            'loc': loc,
             'resource_group': resource_group,
             'vnet_name': 'vcCliTestLogReplayVnet',
             'subnet_name': 'vcCliTestLogReplaySubnet',
@@ -5656,23 +5669,8 @@ class SqlManagedDatabaseLogReplayScenarionTest(ScenarioTest):
             'subscription_id': account['id']
         })
 
-        # Create and prepare VNet and subnet for new virtual cluster
-        self.cmd('network route-table create -g {resource_group} -n {route_table_name} -l {loc}')
-        self.cmd('network route-table show -g {resource_group} -n {route_table_name}')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_default} --next-hop-type Internet --address-prefix 0.0.0.0/0')
-        self.cmd('network route-table route create -g {resource_group} --route-table-name {route_table_name} -n {route_name_subnet_to_vnet_local} --next-hop-type VnetLocal --address-prefix 10.0.0.0/24')
-        self.cmd('network vnet create -g {resource_group} -n {vnet_name} --location {loc} --address-prefix 10.0.0.0/16')
-        # Create network security group
-        self.cmd('network nsg create --resource-group {resource_group} --name {nsg}')
-        # Create subnet and set properties needed
-        self.cmd('network vnet subnet create -g {resource_group} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name}')
-        self.cmd('network vnet subnet update -g {resource_group} --vnet-name {vnet_name} -n {subnet_name} --address-prefix 10.0.0.0/24 --route-table {route_table_name} --delegations Microsoft.Sql/managedInstances --network-security-group {nsg}',
-                 checks=self.check('delegations[0].serviceName', 'Microsoft.Sql/managedInstances'))
-
-        subnet = self.cmd('network vnet subnet show -g {resource_group} --vnet-name {vnet_name} -n {subnet_name}').get_output_in_json()
-
         self.kwargs.update({
-            'subnet_id': subnet['id']
+            'subnet_id': subnet
         })
 
         # Create sql managed_instance
@@ -5696,8 +5694,8 @@ class SqlManagedDatabaseLogReplayScenarionTest(ScenarioTest):
         self.kwargs.update({
             'managed_database_name': managed_database_name,
             'managed_database_name1': managed_database_name1,
-            'storage_sas': 'sp=rl&st=2021-04-12T13:07:20Z&se=2021-04-30T21:07:20Z&spr=https&sv=2020-02-10&sr=c&sig=igoGWjvYceuSkuHRzkm6oPPxitRlSYgGvmdwTbr7WTM%3D',
-            'storage_uri': 'https://mibrkicstorage.blob.core.windows.net/mibrkicportal',
+            'storage_sas': 'sp=rl&st=2021-06-30T13:25:17Z&se=2021-06-30T21:25:17Z&spr=https&sv=2020-08-04&sr=c&sig=f9QOpBZ3sPoMew1nPbZOn9DdI%2FTWDtxqXayxBgF9Ubw%3D',
+            'storage_uri': 'https://tempmi.blob.core.windows.net/mibrkic',
             'last_backup_name': 'full.bak'
         })
 
@@ -5735,6 +5733,8 @@ class SqlManagedDatabaseLogReplayScenarionTest(ScenarioTest):
         # Cancel log replay service
         self.cmd('sql midb log-replay stop -g {resource_group} --mi {managed_instance_name} -n {managed_database_name1} --yes',
                  checks=NoneCheck())
+     
+        self.cmd('sql mi delete -g {resource_group} -n {managed_instance_name} --yes', checks=NoneCheck())
 
 class SqlLedgerDigestUploadsScenarioTest(ScenarioTest):
     def _get_storage_endpoint(self, storage_account, resource_group):
